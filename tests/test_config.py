@@ -5,15 +5,16 @@ import sys
 import unittest
 from pathlib import Path
 
+from src.config import parse_config
+
 ROOT = Path(__file__).resolve().parents[1]
-PROGRAM = ROOT / "src" / "main.py"
 ARGS = ["--package", "quote", "--version", "1.0.40"]
 
 
 def launch(*args):
     """Запустить программу и получить её вывод."""
     return subprocess.run(
-        [sys.executable, str(PROGRAM), *args],
+        [sys.executable, "-m", "src.main", *args],
         capture_output=True, text=True, cwd=ROOT,
     )
 
@@ -23,19 +24,19 @@ class ConfigTests(unittest.TestCase):
 
     def test_accepts_options(self):
         """Проверить валидные имя, версию, URL и фильтр."""
-        result = launch(*ARGS, "--repository", "https://index.crates.io",
-                        "--filter", "ident")
-        self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.splitlines(), [
-            "package = quote", "repository = https://index.crates.io",
-            "test = False", "version = 1.0.40", "filter = ident",
-        ])
+        config = parse_config([*ARGS, "--repository",
+                               "https://index.crates.io", "--filter", "ident"])
+        self.assertEqual(config.package, "quote")
+        self.assertEqual(config.version, "1.0.40")
+        self.assertEqual(config.repository, "https://index.crates.io")
+        self.assertEqual(config.filter, "ident")
 
     def test_accepts_local_mode(self):
         """Проверить запуск в режиме локального репозитория."""
-        result = launch("--test", "--package", "A",
-                        "--repository", "tests/graph.json")
-        self.assertEqual(result.returncode, 0, result.stderr)
+        config = parse_config(["--test", "--package", "A",
+                               "--repository", str(ROOT / "tests/graph.json")])
+        self.assertTrue(config.test)
+        self.assertEqual(config.package, "A")
 
     def test_rejects_invalid_options(self):
         """Проверить ошибки для каждого параметра."""

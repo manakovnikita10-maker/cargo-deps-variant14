@@ -1,4 +1,5 @@
 #!/usr/bin/env sh
 set -eu
 project_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
-exec python3 "$project_dir/src/main.py" "$@"
+export PYTHONPATH="$project_dir${PYTHONPATH:+:$PYTHONPATH}"
+exec python3 -m src.main "$@"
