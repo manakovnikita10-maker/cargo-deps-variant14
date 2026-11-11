@@ -6,7 +6,8 @@ from http import HTTPStatus
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-from src.config import PACKAGE_NAME
+from src.config import PACKAGE_NAME, repository_url
+from src.versions import select_release
 
 HTTP_TIMEOUT = 12
 NAME_GROUP_LENGTH = 3
@@ -88,3 +89,32 @@ class CargoIndex:
         """Прочитать все объявленные прямые зависимости точной версии."""
         entry = self.release(name, version)
         return [Dependency.from_record(dep) for dep in entry["deps"]]
+
+
+    def graph_neighbors(self, exclude):
+        """Вернуть функцию чтения смежных вершин для DFS."""
+        exclude = exclude.casefold()
+
+        def neighbors(node):
+            """Подобрать версию каждого пакета, входящего в граф."""
+            name, version = node.split("@", 1)
+            for dep in self.dependencies(name, version):
+                if dep.kind == "dev":
+                    continue
+                if exclude and exclude in dep.name.casefold():
+                    continue
+                yield self.resolve(dep)
+
+        return neighbors
+
+    def resolve(self, dependency):
+        """Выбрать подходящий выпуск прямой зависимости в текущем индексе."""
+        registry = dependency.registry
+        if registry and repository_url(registry) != self.url:
+            raise ValueError(f"другой индекс для {dependency.name}: {registry}")
+        try:
+            version = select_release(self.releases(dependency.name),
+                                     dependency.requirement)
+        except ValueError as error:
+            raise ValueError(f"{dependency.name}: {error}") from error
+        return f"{dependency.name}@{version}"
