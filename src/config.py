@@ -55,6 +55,14 @@ def repository_url(source):
     return source.rstrip("/")
 
 
+def package_version(value):
+    """Разобрать имя и точную версию графа для обратного поиска."""
+    name, _, version = value.partition("@")
+    if not PACKAGE_NAME.fullmatch(name):
+        raise argparse.ArgumentTypeError("ожидается имя@версия")
+    return name, exact_version(version)
+
+
 def make_parser():
     """Описать параметры программы и сообщения справки."""
     parser = argparse.ArgumentParser(description="Граф зависимостей Cargo")
@@ -63,6 +71,10 @@ def make_parser():
     parser.add_argument("--test", action="store_true", help="локальный JSON")
     parser.add_argument("--version", type=exact_version, help="точная версия")
     parser.add_argument("--filter", type=filter_text, help="фильтр")
+    parser.add_argument("--reverse", action="store_true",
+                        help="показать обратные зависимости")
+    parser.add_argument("--within", type=package_version, metavar="ИМЯ@ВЕРСИЯ",
+                        help="корень графа Cargo для обратного поиска")
     return parser
 
 
@@ -100,4 +112,8 @@ def parse_config(argv=None):
         validate_test(parser, config)
     else:
         validate_cargo(parser, config)
+    if config.within and (config.test or not config.reverse):
+        parser.error("--within применяется только с --reverse для Cargo")
+    if config.reverse and not config.test and not config.within:
+        parser.error("--reverse для Cargo требует --within ИМЯ@ВЕРСИЯ")
     return config
