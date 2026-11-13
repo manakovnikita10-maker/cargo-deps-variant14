@@ -1,31 +1,28 @@
-"""Точка входа для построения графа зависимостей."""
+"""Точка входа для визуализации графа зависимостей."""
 
 import sys
 
 from src.config import parse_config
 from src.graph import dependency_graph
-from src.reverse import find_dependents
+from src.visualization import render_graph, show_image
 
 
 def main(argv=None):
-    """Построить граф с помощью DFS и вывести списки смежности."""
+    """Построить граф, сохранить DOT и SVG и показать изображение."""
     config = parse_config(argv)
     try:
-        if config.reverse:
-            return print_dependents(config)
         graph = dependency_graph(config)
+        name = config.package
+        if config.version:
+            name = f"{name}@{config.version}"
+        dot_file, svg_file = render_graph(graph, config.output_dir, name)
+        print(f"DOT: {dot_file}")
+        print(f"SVG: {svg_file}")
+        if not config.no_open:
+            show_image(svg_file)
     except (OSError, ValueError, KeyError, TypeError, RecursionError) as error:
         print(f"Ошибка: {error}", file=sys.stderr)
         return 1
-    for package, dependencies in graph.items():
-        print(f"{package} -> {', '.join(dependencies) or '—'}")
-    return 0
-
-
-def print_dependents(config):
-    """Показать найденные обратные зависимости в порядке DFS."""
-    packages = find_dependents(config)
-    print("\n".join(packages) if packages else "Обратных зависимостей нет.")
     return 0
 
 
